@@ -17,6 +17,10 @@
 #import <React/RCTBridge.h>
 #import <React/RCTNetworking.h>
 #import <React/RCTUtils.h>
+//#if os(iOS)
+#if TARGET_OS_IOS
+#import <MobileCoreServices/MobileCoreServices.h>
+#endif
 
 @implementation RNCAssetsLibraryRequestHandler
 
@@ -122,26 +126,30 @@ RCT_EXPORT_MODULE()
     // By default, allow downloading images from iCloud
     PHImageRequestOptions *const requestOptions = [PHImageRequestOptions new];
     requestOptions.networkAccessAllowed = YES;
-      requestOptions.deliveryMode = PHImageRequestOptionsDeliveryModeHighQualityFormat;
+    requestOptions.deliveryMode = PHImageRequestOptionsDeliveryModeHighQualityFormat;
 
-      CGSize const targetSize = CGSizeMake((CGFloat)asset.pixelWidth, (CGFloat)asset.pixelHeight);
-      [[PHImageManager defaultManager] requestImageForAsset:asset
-                                                 targetSize:targetSize
-                                                contentMode:PHImageContentModeDefault
-                                                    options:requestOptions
-                                              resultHandler:^(UIImage * _Nullable image,
-                                                              NSDictionary * _Nullable info) {
+    [PHImageManager.defaultManager requestImageDataForAsset:asset options:requestOptions resultHandler:^(NSData * _Nullable imageData, NSString * _Nullable dataUTI, UIImageOrientation orientation, NSDictionary * _Nullable info) {
+          
       NSError *const error = [info objectForKey:PHImageErrorKey];
       if (error) {
         [delegate URLRequest:cancellationBlock didCompleteWithError:error];
         return;
       }
       
-      NSData *const imageData = UIImageJPEGRepresentation(image, 1.0);
       NSInteger const length = [imageData length];
-
+        NSString *mimeType = @"image/jpeg";
+#if TARGET_OS_IOS
+        if (dataUTI) {
+            NSString *tag = (__bridge NSString *)(UTTypeCopyPreferredTagWithClass((__bridge CFStringRef _Nonnull)(dataUTI), kUTTagClassMIMEType));
+            if (tag) {
+                mimeType = tag;
+            }
+        }
+        NSLog(@"Mime Type %@", mimeType);
+#endif
+//        NSString *mimeType = UTTypeCopyAllTagsWithClass(dataUTI as CFString, tagClass as CFString)?.takeRetainedValue() else { return [] }
       NSURLResponse *const response = [[NSURLResponse alloc] initWithURL:request.URL
-                                                                MIMEType:@"image/jpeg"
+                                                                MIMEType:mimeType
                                                    expectedContentLength:length
                                                         textEncodingName:nil];
 
